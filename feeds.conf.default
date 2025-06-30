@@ -4,3 +4,7 @@ src-git routing https://github.com/openwrt/routing.git;openwrt-24.10
 src-git telephony https://github.com/openwrt/telephony.git;openwrt-24.10
 src-git lienol https://github.com/Lienol/openwrt-package.git;main
 src-git other https://github.com/Lienol/openwrt-package.git;other
+
+#添加了store商店，同时修复golong环境
+src-git store https://github.com/linkease/istore.git;main
+src-git helloworld https://github.com/fw876/helloworld.git
