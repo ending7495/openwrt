@@ -35,7 +35,7 @@ jobs:
       # 合并上游，遇到冲突以 theirs（上游）为主
       - name: Merge upstream/24.10 (theirs)
         run: |
-          git checkout 24.10   # 如果你的主分支不是24.10，请改为实际分支名
+          git checkout 24.10
           git merge upstream/24.10 -X theirs --allow-unrelated-histories || true
 
       # 恢复本地优先文件
@@ -73,4 +73,4 @@ jobs:
         run: |
           git add package/default-settings/files/zzz-default-settings feeds.conf.default || true
           git commit -am "Auto sync upstream (with local priority for zzz-default-settings & feeds.conf.default)" || true
-          git push origin 24.10   # 如果你的主分支不是24.10，请改为实际分支名
+          git push https://x-access-token:${GH_TOKEN}@github.com/ending7495/openwrt.git 24.10
