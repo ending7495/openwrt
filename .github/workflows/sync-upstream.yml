@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0   # 必须完整拉取历史
+          fetch-depth: 0
 
       - name: Set up git
         run: |
@@ -44,8 +44,22 @@ jobs:
           cp -f .sync-backup/zzz-default-settings package/default-settings/files/zzz-default-settings || true
           cp -f .sync-backup/feeds.conf.default feeds.conf.default || true
 
-      # 强制添加、提交（即使有冲突也覆盖）
+      # 检查本地优先文件是否被成功还原，否则终止同步
+      - name: Ensure local-priority files are preserved
+        id: checkfiles
+        run: |
+          cmp -s .sync-backup/zzz-default-settings package/default-settings/files/zzz-default-settings
+          ret1=$?
+          cmp -s .sync-backup/feeds.conf.default feeds.conf.default
+          ret2=$?
+          if [ "$ret1" != "0" ] || [ "$ret2" != "0" ]; then
+            echo "::error ::Local-priority files were overwritten after upstream sync. Aborting push."
+            exit 1
+          fi
+
+      # 强制添加、提交、推送（仅在本地优先文件未被覆盖时）
       - name: Commit and push changes
+        if: steps.checkfiles.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
