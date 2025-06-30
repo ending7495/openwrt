@@ -22,7 +22,7 @@ jobs:
 
       - name: Add upstream remote
         run: |
-          git remote add upstream https://github.com/openwrt/openwrt.git
+          git remote add upstream https://github.com/Lienol/openwrt.git
           git fetch upstream
 
       # 备份本地优先文件
@@ -33,10 +33,10 @@ jobs:
           cp -f feeds.conf.default .sync-backup/feeds.conf.default || true
 
       # 合并上游，遇到冲突以 theirs（上游）为主
-      - name: Merge upstream/master (theirs)
+      - name: Merge upstream/24.10 (theirs)
         run: |
-          git checkout master   # 如果你的主分支是 main，请改为 main
-          git merge upstream/master -X theirs --allow-unrelated-histories || true
+          git checkout 24.10   # 如果你的主分支不是24.10，请改为实际分支名
+          git merge upstream/24.10 -X theirs --allow-unrelated-histories || true
 
       # 恢复本地优先文件
       - name: Restore local-priority files
@@ -44,10 +44,18 @@ jobs:
           cp -f .sync-backup/zzz-default-settings package/default-settings/files/zzz-default-settings || true
           cp -f .sync-backup/feeds.conf.default feeds.conf.default || true
 
-      # 检查本地优先文件是否被成功还原，否则终止同步
+      # 检查本地优先文件是否存在且内容一致，否则终止同步
       - name: Ensure local-priority files are preserved
         id: checkfiles
         run: |
+          if [ ! -f .sync-backup/zzz-default-settings ] || [ ! -f .sync-backup/feeds.conf.default ]; then
+            echo "::error ::Backup of local-priority files not found. Please ensure both files exist before running sync."
+            exit 1
+          fi
+          if [ ! -f package/default-settings/files/zzz-default-settings ] || [ ! -f feeds.conf.default ]; then
+            echo "::error ::After merge, local-priority files are missing! Aborting push."
+            exit 1
+          fi
           cmp -s .sync-backup/zzz-default-settings package/default-settings/files/zzz-default-settings
           ret1=$?
           cmp -s .sync-backup/feeds.conf.default feeds.conf.default
@@ -65,4 +73,4 @@ jobs:
         run: |
           git add package/default-settings/files/zzz-default-settings feeds.conf.default || true
           git commit -am "Auto sync upstream (with local priority for zzz-default-settings & feeds.conf.default)" || true
-          git push origin master   # 如果你的主分支是 main，请改为 main
+          git push origin 24.10   # 如果你的主分支不是24.10，请改为实际分支名
