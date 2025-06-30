@@ -1,0 +1,54 @@
+name: Sync Upstream With Local Priority
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0   # 必须完整拉取历史
+
+      - name: Set up git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/openwrt/openwrt.git
+          git fetch upstream
+
+      # 备份本地优先文件
+      - name: Backup local-priority files
+        run: |
+          mkdir -p .sync-backup
+          cp -f package/default-settings/files/zzz-default-settings .sync-backup/zzz-default-settings || true
+          cp -f feeds.conf.default .sync-backup/feeds.conf.default || true
+
+      # 合并上游，遇到冲突以 theirs（上游）为主
+      - name: Merge upstream/master (theirs)
+        run: |
+          git checkout master   # 如果你的主分支是 main，请改为 main
+          git merge upstream/master -X theirs --allow-unrelated-histories || true
+
+      # 恢复本地优先文件
+      - name: Restore local-priority files
+        run: |
+          cp -f .sync-backup/zzz-default-settings package/default-settings/files/zzz-default-settings || true
+          cp -f .sync-backup/feeds.conf.default feeds.conf.default || true
+
+      # 强制添加、提交（即使有冲突也覆盖）
+      - name: Commit and push changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git add package/default-settings/files/zzz-default-settings feeds.conf.default || true
+          git commit -am "Auto sync upstream (with local priority for zzz-default-settings & feeds.conf.default)" || true
+          git push origin master   # 如果你的主分支是 main，请改为 main
