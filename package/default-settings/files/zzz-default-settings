@@ -1,69 +1,82 @@
 #!/bin/sh
 
+# 创建 root 用户的 crontab 文件（如果不存在）
 touch /etc/crontabs/root
 
+# 设置 LuCI 界面语言为中文
 uci set luci.main.lang=zh_cn
-#设置默认主题
+# 设置 LuCI 默认主题为 bootstrap
 uci set luci.main.mediaurlbase=/luci-static/bootstrap
+# 提交 LuCI 配置更改
 uci commit luci
 
+# 设置系统时区为 CST-8（北京时间）
 uci set system.@system[0].timezone=CST-8
+# 设置时区名称为 Asia/Shanghai
 uci set system.@system[0].zonename=Asia/Shanghai
+# 提交系统配置更改
 uci commit system
 
+# 启用自动挂载（允许匿名挂载）
 uci set fstab.@global[0].anon_mount=1
+# 提交文件系统配置更改
 uci commit fstab
 
+# 创建 ip 命令的软链接（确保 /usr/bin/ip 可用）
 ln -sf /sbin/ip /usr/bin/ip
 
-sed -i '/lienol/d' /etc/opkg/distfeeds.conf
-sed -i '/other/d' /etc/opkg/distfeeds.conf
-#sed -i 's/downloads.openwrt.org/openwrt.proxy.ustclug.org/g' /etc/opkg/distfeeds.conf
-#sed -i 's/http/https/g' /etc/opkg/distfeeds.conf
-sed -i "s/# //g" /etc/opkg/distfeeds.conf
+# 使用北京大学镜像源替换现有的软件源配置
+arch=$(grep DISTRIB_ARCH /etc/openwrt_release | cut -d"'" -f2)
+branch=$(grep DISTRIB_RELEASE /etc/openwrt_release | cut -d"'" -f2)
+mirror_base="https://mirrors.pku.edu.cn/openwrt/releases/$branch/packages/$arch"
 
-#sed -i 's/root::0:0:99999:7:::/root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::/g' /etc/shadow
+# 重建 distfeeds.conf 文件
+cat > /etc/opkg/distfeeds.conf <<EOF
+src/gz openwrt_base $mirror_base/base
+src/gz openwrt_luci $mirror_base/luci
+src/gz openwrt_packages $mirror_base/packages
+src/gz openwrt_routing $mirror_base/routing
+src/gz openwrt_telephony $mirror_base/telephony
+EOF
 
-uci set dhcp.lan.ra='server'
-uci -q del dhcp.lan.dhcpv6
-uci set dhcp.lan.dns_service='0'
-uci set dhcp.lan.ra_management='1'
-uci -q del dhcp.lan.ra_slaac
-#uci set dhcp.@dnsmasq[0].localservice=0
-#uci set dhcp.@dnsmasq[0].nonwildcard=0
+# 配置 DHCP IPv6 设置
+uci set dhcp.lan.ra='server'          # 作为路由器通告服务器
+uci -q del dhcp.lan.dhcpv6            # 删除旧的 DHCPv6 设置
+uci set dhcp.lan.dns_service='0'      # 禁用 DNS 服务
+uci set dhcp.lan.ra_management='1'    # 启用路由通告管理
+uci -q del dhcp.lan.ra_slaac          # 删除 SLAAC 设置
+# 提交 DHCP 配置更改
 uci commit dhcp
 
-#uci set network.lan.ipaddr='192.168.119.254'
-#uci set network.lan.netmask='255.255.255.0'
-#uci set network.lan.ip6assign='64'
-#uci commit network
-
+# 启用 WiFi 接口（移除禁用标记并启动）
 sed -i '/option disabled/d' /etc/config/wireless
 sed -i '/set wireless.radio${devidx}.disabled/d' /lib/wifi/mac80211.sh
 wifi up
 
+# 设置 OpenWrt 版本描述信息
 sed -i '/DISTRIB_DESCRIPTION/d' /etc/openwrt_release
 echo "DISTRIB_DESCRIPTION='OpenWrt 24.10'" >> /etc/openwrt_release
 
-# 删除状态页不需显示的
+# 隐藏状态页默认视图（删除原始页面）
 rm -rf /usr/lib/lua/luci/view/admin_status/index
-#mv -f /usr/lib/lua/luci/view/admin_status/index /usr/lib/lua/luci/view/admin_status/index_backup 2>/dev/null
 
+# 替换主题 footer 中的项目链接
 sed -i 's#openwrt/luci#lienol/openwrt-luci#g' /usr/lib/lua/luci/view/themes/*/footer.htm
 
-#禁用某些可能会自启动且用不上的依赖包服务
-/etc/init.d/php7-fastcgi disable 2>/dev/null
-/etc/init.d/php7-fpm disable 2>/dev/null
-/etc/init.d/php8-fastcgi disable 2>/dev/null
-/etc/init.d/php8-fpm disable 2>/dev/null
-/etc/init.d/softethervpnbridge disable 2>/dev/null
-/etc/init.d/softethervpnserver disable 2>/dev/null
-/etc/init.d/softethervpnclient disable 2>/dev/null
-/etc/init.d/haproxy disable 2>/dev/null
-/etc/init.d/kcptun disable 2>/dev/null
+# 禁用不必要服务（防止自启动）
+for svc in \
+    php7-fastcgi php7-fpm \
+    php8-fastcgi php8-fpm \
+    softethervpnbridge softethervpnserver softethervpnclient \
+    haproxy kcptun; do
+    /etc/init.d/$svc disable 2>/dev/null
+done
 
+# 统一设置服务脚本权限为 0755
 chmod 0755 /etc/init.d/*
 
+# 清除 LuCI 缓存
 rm -rf /tmp/luci-*cache
 
+# 脚本成功退出
 exit 0
