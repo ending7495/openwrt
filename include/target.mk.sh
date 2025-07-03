@@ -53,22 +53,10 @@ DEFAULT_PACKAGES.nas:=\
 ##@
 # @brief Default packages for @DEVICE_TYPE router.
 ##
-# DEFAULT_PACKAGES.router:=\
-# 	dnsmasq-full \
-# 	firewall4 \
-# 	nftables \
-# 	odhcp6c \
-# 	odhcpd-ipv6only \
-# 	ppp \
-# 	ppp-mod-pppoe
-
-# ifneq ($(DUMP),)
-#   all: dumpinfo
-# endif
-
-#去除默认防火墙，去除了firewall4+nftable
 DEFAULT_PACKAGES.router:=\
 	dnsmasq-full \
+	firewall4 \
+	nftables \
 	odhcp6c \
 	odhcpd-ipv6only \
 	ppp \
@@ -77,6 +65,7 @@ DEFAULT_PACKAGES.router:=\
 ifneq ($(DUMP),)
   all: dumpinfo
 endif
+
 
 
 
