@@ -163,6 +163,7 @@ platform_do_upgrade() {
 		;;
 	mercusys,mr80x-v3|\
 	mercusys,mr90x-v1|\
+	tplink,archer-ax80-v1|\
 	tplink,re6000xd)
 		CI_UBIPART="ubi0"
 		nand_do_upgrade "$1"
@@ -171,6 +172,10 @@ platform_do_upgrade() {
 		CI_UBIPART="ubi"
 		CI_KERNPART="kernel"
 		CI_ROOTPART="rootfs"
+		nand_do_upgrade "$1"
+		;;
+	teltonika,rutc50)
+		CI_UBIPART="$(cmdline_get_var ubi.mtd)"
 		nand_do_upgrade "$1"
 		;;
 	nradio,c8-668gl)
