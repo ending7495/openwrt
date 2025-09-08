@@ -91,6 +91,7 @@ case "$board" in
 	cudy,wr3000e-v1|\
 	cudy,wr3000s-v1|\
 	cudy,wr3000h-v1|\
+	cudy,wr3000p-v1|\
 	cudy,wr3000-v1)
 		addr=$(mtd_get_mac_binary bdinfo 0xde00)
 		# Originally, phy0 is phy1 mac with LA bit set. However, this would conflict
@@ -131,6 +132,7 @@ case "$board" in
 		# addresses on multiple VIFs with the other radio. Use label mac to set LA bit.
 		[ "$PHYNBR" = "1" ] && macaddr_setbit_la $(get_mac_label) > /sys${DEVPATH}/macaddress
 		;;
+	jdcloud,re-cp-03-mod|\
 	jdcloud,re-cp-03)
 		[ "$PHYNBR" = "1" ] && mmc_get_mac_binary factory 0xa > /sys${DEVPATH}/macaddress
 		;;
