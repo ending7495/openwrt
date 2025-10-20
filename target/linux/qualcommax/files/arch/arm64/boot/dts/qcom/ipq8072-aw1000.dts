@@ -200,6 +200,12 @@
 	};
 };
 
+&qusb_phy_1 {
+	status = "okay";
+
+	vdd-supply = <&usb_vbus>;
+};
+
 &mdio {
 	status = "okay";
 
