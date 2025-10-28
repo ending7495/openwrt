@@ -1,7 +1,7 @@
-From 2d530b1085104f6aa0dfa35c908ac7c531941bf6 Mon Sep 17 00:00:00 2001
+From df874f9e52c340cc6f0a0014a97b778f67d46849 Mon Sep 17 00:00:00 2001
 From: "Russell King (Oracle)" <rmk+kernel@armlinux.org.uk>
 Date: Tue, 3 Dec 2024 15:31:28 +0000
-Subject: [PATCH 11/22] v6.14: net: phylink: add pcs_inband_caps() method
+Subject: [PATCH 09/13] net: phylink: add pcs_inband_caps() method
 
 Add a pcs_inband_caps() method to query the PCS for its inband link
 capabilities, and use this to determine whether link modes used with
@@ -22,7 +22,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
 
 --- a/drivers/net/phy/phylink.c
 +++ b/drivers/net/phy/phylink.c
-@@ -988,6 +988,15 @@ static void phylink_resolve_an_pause(str
+@@ -1038,6 +1038,15 @@ static void phylink_resolve_an_pause(str
  	}
  }
  
@@ -38,7 +38,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  static void phylink_pcs_pre_config(struct phylink_pcs *pcs,
  				   phy_interface_t interface)
  {
-@@ -1041,6 +1050,24 @@ static void phylink_pcs_link_up(struct p
+@@ -1091,6 +1100,24 @@ static void phylink_pcs_link_up(struct p
  		pcs->ops->pcs_link_up(pcs, neg_mode, interface, speed, duplex);
  }
  
@@ -63,7 +63,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  static void phylink_pcs_poll_stop(struct phylink *pl)
  {
  	if (pl->cfg_link_an_mode == MLO_AN_INBAND)
-@@ -2532,6 +2559,26 @@ int phylink_ethtool_ksettings_get(struct
+@@ -2443,6 +2470,26 @@ int phylink_ethtool_ksettings_get(struct
  }
  EXPORT_SYMBOL_GPL(phylink_ethtool_ksettings_get);
  
@@ -90,7 +90,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  /**
   * phylink_ethtool_ksettings_set() - set the link settings
   * @pl: a pointer to a &struct phylink returned from phylink_create()
-@@ -2667,6 +2714,13 @@ int phylink_ethtool_ksettings_set(struct
+@@ -2578,6 +2625,13 @@ int phylink_ethtool_ksettings_set(struct
  	    phylink_is_empty_linkmode(config.advertising))
  		return -EINVAL;
  
@@ -104,7 +104,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  	mutex_lock(&pl->state_mutex);
  	pl->link_config.speed = config.speed;
  	pl->link_config.duplex = config.duplex;
-@@ -3351,6 +3405,12 @@ static int phylink_sfp_config_optical(st
+@@ -3274,6 +3328,12 @@ static int phylink_sfp_config_optical(st
  	phylink_dbg(pl, "optical SFP: chosen %s interface\n",
  		    phy_modes(interface));
  
@@ -119,7 +119,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  	/* Ignore errors if we're expecting a PHY to attach later */
 --- a/include/linux/phylink.h
 +++ b/include/linux/phylink.h
-@@ -419,6 +419,7 @@ struct phylink_pcs {
+@@ -432,6 +432,7 @@ struct phylink_pcs {
  /**
   * struct phylink_pcs_ops - MAC PCS operations structure.
   * @pcs_validate: validate the link configuration.
@@ -127,7 +127,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
   * @pcs_enable: enable the PCS.
   * @pcs_disable: disable the PCS.
   * @pcs_pre_config: pre-mac_config method (for errata)
-@@ -434,6 +435,8 @@ struct phylink_pcs {
+@@ -445,6 +446,8 @@ struct phylink_pcs {
  struct phylink_pcs_ops {
  	int (*pcs_validate)(struct phylink_pcs *pcs, unsigned long *supported,
  			    const struct phylink_link_state *state);
@@ -136,7 +136,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  	int (*pcs_enable)(struct phylink_pcs *pcs);
  	void (*pcs_disable)(struct phylink_pcs *pcs);
  	void (*pcs_pre_config)(struct phylink_pcs *pcs,
-@@ -471,6 +474,20 @@ int pcs_validate(struct phylink_pcs *pcs
+@@ -481,6 +484,20 @@ int pcs_validate(struct phylink_pcs *pcs
  		 const struct phylink_link_state *state);
  
  /**

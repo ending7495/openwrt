@@ -16,7 +16,7 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
 
 --- a/drivers/net/phy/phylink.c
 +++ b/drivers/net/phy/phylink.c
-@@ -1150,6 +1150,72 @@ static void phylink_pcs_an_restart(struc
+@@ -1116,6 +1116,72 @@ static void phylink_pcs_an_restart(struc
  		pl->pcs->ops->pcs_an_restart(pl->pcs);
  }
  

@@ -1,7 +1,7 @@
-From 7b0f0f00a301906cc78d3c8974ea14ad8db29f0c Mon Sep 17 00:00:00 2001
+From b4c7698dd95f253c6958d8c6ac219098009bf28a Mon Sep 17 00:00:00 2001
 From: "Russell King (Oracle)" <rmk+kernel@armlinux.org.uk>
 Date: Tue, 3 Dec 2024 15:31:02 +0000
-Subject: [PATCH 10/22] v6.14: net: phy: add phy_inband_caps()
+Subject: [PATCH 04/13] net: phy: add phy_inband_caps()
 
 Add a method to query the PHY's in-band capabilities for a PHY
 interface mode.
@@ -92,7 +92,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
   * struct phy_plca_cfg - Configuration of the PLCA (Physical Layer Collision
   * Avoidance) Reconciliation Sublayer.
   *
-@@ -955,6 +973,14 @@ struct phy_driver {
+@@ -954,6 +972,14 @@ struct phy_driver {
  	int (*get_features)(struct phy_device *phydev);
  
  	/**
@@ -107,7 +107,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  	 * @get_rate_matching: Get the supported type of rate matching for a
  	 * particular phy interface. This is used by phy consumers to determine
  	 * whether to advertise lower-speed modes for that interface. It is
-@@ -1840,6 +1866,8 @@ int phy_config_aneg(struct phy_device *p
+@@ -1832,6 +1858,8 @@ int phy_config_aneg(struct phy_device *p
  int _phy_start_aneg(struct phy_device *phydev);
  int phy_start_aneg(struct phy_device *phydev);
  int phy_aneg_done(struct phy_device *phydev);
