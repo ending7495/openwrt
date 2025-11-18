@@ -89,12 +89,12 @@ platform_do_upgrade() {
 	bananapi,bpi-r4-lite|\
 	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
+	comfast,cf-wr632ax-ubootmod|\
 	cudy,tr3000-v1-ubootmod|\
 	gatonetworks,gdsp|\
 	h3c,magic-nx30-pro|\
 	jcg,q30-pro|\
 	jdcloud,re-cp-03|\
-	jdcloud,re-cp-03-mod|\
 	konka,komi-a31|\
 	mediatek,mt7981-rfb|\
 	mediatek,mt7988a-rfb|\
@@ -183,6 +183,7 @@ platform_do_upgrade() {
 	mercusys,mr80x-v3|\
 	mercusys,mr90x-v1|\
 	tplink,archer-ax80-v1|\
+	tplink,be450|\
 	tplink,re6000xd)
 		CI_UBIPART="ubi0"
 		nand_do_upgrade "$1"
@@ -257,12 +258,12 @@ platform_check_image() {
 	bananapi,bpi-r4-lite|\
 	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
+	comfast,cf-wr632ax-ubootmod|\
 	cudy,tr3000-v1-ubootmod|\
 	gatonetworks,gdsp|\
 	h3c,magic-nx30-pro|\
 	jcg,q30-pro|\
 	jdcloud,re-cp-03|\
-	konka,komi-a31|\
 	mediatek,mt7981-rfb|\
 	mediatek,mt7988a-rfb|\
 	mercusys,mr90x-v1-ubi|\
@@ -330,7 +331,6 @@ platform_copy_config() {
 	huasifei,wh3000|\
 	huasifei,wh3000-pro|\
 	jdcloud,re-cp-03|\
-	jdcloud,re-cp-03-mod|\
 	nradio,c8-668gl|\
 	smartrg,sdg-8612|\
 	smartrg,sdg-8614|\

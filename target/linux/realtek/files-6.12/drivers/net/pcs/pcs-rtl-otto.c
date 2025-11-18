@@ -10,6 +10,7 @@
 #include <linux/phylink.h>
 #include <linux/regmap.h>
 
+#define RTPCS_SDS_CNT				14
 #define RTPCS_PORT_CNT				57
 
 #define RTPCS_SPEED_10				0
@@ -100,6 +101,8 @@ struct rtpcs_ctrl {
 	struct mii_bus *bus;
 	const struct rtpcs_config *cfg;
 	struct rtpcs_link *link[RTPCS_PORT_CNT];
+	bool rx_pol_inv[RTPCS_SDS_CNT];
+	bool tx_pol_inv[RTPCS_SDS_CNT];
 	struct mutex lock;
 };
 
@@ -692,32 +695,6 @@ static int rtpcs_930x_sds_clock_wait(struct rtpcs_ctrl *ctrl, int timeout)
 	} while (jiffies < start + (HZ / 1000) * timeout);
 
 	return 1;
-}
-
-static void rtpcs_930x_sds_mac_link_config(struct rtpcs_ctrl *ctrl, int sds,
-					   bool tx_normal, bool rx_normal)
-{
-	u32 v10, v1;
-
-	v10 = rtpcs_sds_read(ctrl, sds, 6, 2); /* 10GBit, page 6, reg 2 */
-	v1 = rtpcs_sds_read(ctrl, sds, 0, 0); /* 1GBit, page 0, reg 0 */
-	pr_info("%s: registers before %08x %08x\n", __func__, v10, v1);
-
-	v10 &= ~(BIT(13) | BIT(14));
-	v1 &= ~(BIT(8) | BIT(9));
-
-	v10 |= rx_normal ? 0 : BIT(13);
-	v1 |= rx_normal ? 0 : BIT(9);
-
-	v10 |= tx_normal ? 0 : BIT(14);
-	v1 |= tx_normal ? 0 : BIT(8);
-
-	rtpcs_sds_write(ctrl, sds, 6, 2, v10);
-	rtpcs_sds_write(ctrl, sds, 0, 0, v1);
-
-	v10 = rtpcs_sds_read(ctrl, sds, 6, 2);
-	v1 = rtpcs_sds_read(ctrl, sds, 0, 0);
-	pr_info("%s: registers after %08x %08x\n", __func__, v10, v1);
 }
 
 __attribute__((unused))
@@ -1647,6 +1624,25 @@ static int rtpcs_930x_sds_10g_idle(struct rtpcs_ctrl *ctrl, int sds_num)
 	return -EIO;
 }
 
+static int rtpcs_930x_sds_set_polarity(struct rtpcs_ctrl *ctrl, u32 sds,
+				       bool tx_inv, bool rx_inv)
+{
+	u8 rx_val = rx_inv ? 1 : 0;
+	u8 tx_val = tx_inv ? 1 : 0;
+	u32 val;
+	int ret;
+
+	/* 10GR */
+	val = (tx_val << 1) | rx_val;
+	ret = rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 14, 13, val);
+	if (ret)
+		return ret;
+
+	/* 1G */
+	val = (rx_val << 1) | tx_val;
+	return rtpcs_sds_write_bits(ctrl, sds, 0x0, 0x0, 9, 8, val);
+}
+
 static const sds_config rtpcs_930x_sds_cfg_10gr_even[] =
 {
 	/* 1G */
@@ -1918,8 +1914,9 @@ static int rtpcs_930x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 	/* ----> dal_longan_sds_mode_set */
 	pr_info("%s: Configuring RTL9300 SERDES %d\n", __func__, sds);
 
-	/* Configure link to MAC */
-	rtpcs_930x_sds_mac_link_config(ctrl, sds, true, true);	/* MAC Construct */
+	/* Set SDS polarity */
+	rtpcs_930x_sds_set_polarity(ctrl, sds, ctrl->tx_pol_inv[sds],
+				    ctrl->rx_pol_inv[sds]);
 
 	/* Enable SDS in desired mode */
 	rtpcs_930x_sds_mode_set(ctrl, sds, phy_mode);
@@ -2276,6 +2273,29 @@ static int rtpcs_931x_sds_link_sts_get(struct rtpcs_ctrl *ctrl, u32 sds)
 	return sts1;
 }
 
+static int rtpcs_931x_sds_set_polarity(struct rtpcs_ctrl *ctrl, u32 sds,
+				       bool tx_inv, bool rx_inv)
+{
+	u8 rx_val = rx_inv ? 1 : 0;
+	u8 tx_val = tx_inv ? 1 : 0;
+	u32 val;
+	int ret;
+
+	/* 10gr_*_inv */
+	val = (tx_val << 1) | rx_val;
+	ret = rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 14, 13, val);
+	if (ret)
+		return ret;
+
+	/* xsg_*_inv */
+	val = (rx_val << 1) | tx_val;
+	ret = rtpcs_sds_write_bits(ctrl, sds, 0x40, 0x0, 9, 8, val);
+	if (ret)
+		return ret;
+
+	return rtpcs_sds_write_bits(ctrl, sds, 0x80, 0x0, 9, 8, val);
+}
+
 static sds_config sds_config_10p3125g_type1[] = {
 	{ 0x2E, 0x00, 0x0107 }, { 0x2E, 0x01, 0x01A3 }, { 0x2E, 0x02, 0x6A24 },
 	{ 0x2E, 0x03, 0xD10D }, { 0x2E, 0x04, 0x8000 }, { 0x2E, 0x05, 0xA17E },
@@ -2497,6 +2517,9 @@ static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 			regmap_write(ctrl->map, RTL93XX_CHIP_INFO, val);
 		}
 	}
+
+	rtpcs_931x_sds_set_polarity(ctrl, sds, ctrl->tx_pol_inv[sds],
+				    ctrl->rx_pol_inv[sds]);
 
 	val = ori & ~BIT(sds);
 	regmap_write(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, val);
@@ -2732,7 +2755,10 @@ static int rtpcs_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct device *dev = &pdev->dev;
+	struct device_node *child;
 	struct rtpcs_ctrl *ctrl;
+	u32 sds;
+	int ret;
 
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl)
@@ -2749,6 +2775,18 @@ static int rtpcs_probe(struct platform_device *pdev)
 	ctrl->bus = rtpcs_probe_serdes_bus(ctrl);
 	if (IS_ERR(ctrl->bus))
 		return PTR_ERR(ctrl->bus);
+
+	for_each_child_of_node(dev->of_node, child) {
+		ret = of_property_read_u32(child, "reg", &sds);
+		if (ret)
+			return ret;
+		if (sds >= RTPCS_SDS_CNT)
+			return -EINVAL;
+
+		ctrl->rx_pol_inv[sds] = of_property_read_bool(child, "realtek,pnswap-rx");
+		ctrl->tx_pol_inv[sds] = of_property_read_bool(child, "realtek,pnswap-tx");
+	}
+
 	/*
 	 * rtpcs_create() relies on that fact that data is attached to the platform device to
 	 * determine if the driver is ready. Do this after everything is initialized properly.
