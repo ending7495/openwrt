@@ -62,15 +62,15 @@ struct rmnet_nss_cb {
         int (*nss_tx)(struct sk_buff *skb);
 };
 static struct rmnet_nss_cb __read_mostly *nss_cb = NULL;
-#if defined(CONFIG_PINCTRL_IPQ807x) || defined(CONFIG_PINCTRL_IPQ5018) || defined(CONFIG_PINCTRL_IPQ8074)
-//#ifdef CONFIG_RMNET_DATA //spf12.x none, not effect for spf11.x
+#if defined(CONFIG_PINCTRL_IPQ807x) || defined(CONFIG_PINCTRL_IPQ5018)
+#ifdef CONFIG_RMNET_DATA
 #define CONFIG_QCA_NSS_DRV
 /* define at qsdk/qca/src/linux-4.4/net/rmnet_data/rmnet_data_main.c */ //for spf11.x
 /* define at qsdk/qca/src/datarmnet/core/rmnet_config.c */ //for spf12.x
 /* set at qsdk/qca/src/data-kernel/drivers/rmnet-nss/rmnet_nss.c */
 /* need add DEPENDS:= kmod-rmnet-core in feeds/makefile */
 extern struct rmnet_nss_cb *rmnet_nss_callbacks __rcu __read_mostly;
-//#endif
+#endif
 #endif
 
 /* This driver supports wwan (3G/LTE/?) devices using a vendor
@@ -809,19 +809,6 @@ static void rmnet_vnd_update_tx_stats(struct net_device *net,
 #endif
 }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(6,5,0))
-static inline unsigned int u64_stats_fetch_begin_irq(const struct u64_stats_sync *syncp)
-{
-	return u64_stats_fetch_begin(syncp);
-}
-
-static inline bool u64_stats_fetch_retry_irq(const struct u64_stats_sync *syncp,
-					     unsigned int start)
-{
-	return u64_stats_fetch_retry(syncp, start);
-}
-#endif
-
 #if defined(MHI_NETDEV_STATUS64)
 static struct rtnl_link_stats64 *_rmnet_vnd_get_stats64(struct net_device *net, struct rtnl_link_stats64 *stats)
 {
@@ -841,35 +828,35 @@ static struct rtnl_link_stats64 *_rmnet_vnd_get_stats64(struct net_device *net, 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION( 6,1,0 ))
 		u64 rx_packets, rx_bytes;
 		u64 tx_packets, tx_bytes;
+#else
+		u64_stats_t rx_packets, rx_bytes;
+		u64_stats_t tx_packets, tx_bytes;
+#endif
 
 		stats64 = per_cpu_ptr(dev->stats64, cpu);
 
 		do {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION( 6,6,0 ))
+			start = u64_stats_fetch_begin(&stats64->syncp);
+#else
 			start = u64_stats_fetch_begin_irq(&stats64->syncp);
+#endif
 			rx_packets = stats64->rx_packets;
 			rx_bytes = stats64->rx_bytes;
 			tx_packets = stats64->tx_packets;
 			tx_bytes = stats64->tx_bytes;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION( 6,6,0 ))
+		} while (u64_stats_fetch_retry(&stats64->syncp, start));
+#else
 		} while (u64_stats_fetch_retry_irq(&stats64->syncp, start));
+#endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION( 6,1,0 ))
 		stats->rx_packets += rx_packets;
 		stats->rx_bytes += rx_bytes;
 		stats->tx_packets += tx_packets;
 		stats->tx_bytes += tx_bytes;
 #else
-        u64_stats_t rx_packets, rx_bytes;
-		u64_stats_t tx_packets, tx_bytes;
-
-		stats64 = per_cpu_ptr(dev->stats64, cpu);
-
-		do {
-			start = u64_stats_fetch_begin_irq(&stats64->syncp);
-			rx_packets = stats64->rx_packets;
-			rx_bytes = stats64->rx_bytes;
-			tx_packets = stats64->tx_packets;
-			tx_bytes = stats64->tx_bytes;
-		} while (u64_stats_fetch_retry_irq(&stats64->syncp, start));
-
         stats->rx_packets += u64_stats_read(&rx_packets);
 		stats->rx_bytes += u64_stats_read(&rx_bytes);
 		stats->tx_packets += u64_stats_read(&tx_packets);
@@ -1369,8 +1356,12 @@ static int qmap_register_device(sQmiWwanQmap * pDev, u8 offset_id)
 #endif
 	priv->agg_skb = NULL;
 	priv->agg_count = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,18,0)
 	hrtimer_init(&priv->agg_hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	priv->agg_hrtimer.function = rmnet_usb_tx_agg_timer_cb;
+#else
+	hrtimer_setup(&priv->agg_hrtimer, rmnet_usb_tx_agg_timer_cb, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+#endif
 	INIT_WORK(&priv->agg_wq, rmnet_usb_tx_agg_work);
 	ktime_get_ts64(&priv->agg_time);
 	spin_lock_init(&priv->agg_lock);
@@ -1472,6 +1463,8 @@ typedef struct {
     u8 brmac[ETH_ALEN];
 } BRMAC_SETTING;
 #endif
+
+static int qma_setting_store(struct device *dev, QMAP_SETTING *qmap_settings, size_t size);
 
 int qma_setting_store(struct device *dev, QMAP_SETTING *qmap_settings, size_t size) {
 	struct net_device *netdev = to_net_dev(dev);
@@ -2150,7 +2143,14 @@ static int qmi_wwan_bind(struct usbnet *dev, struct usb_interface *intf)
 #endif
 		}
 	if (!_usbnet_get_stats64)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION( 6,10,0 ))
 		_usbnet_get_stats64 = dev->net->netdev_ops->ndo_get_stats64;
+#else
+		/* From kernel 6.10+, usbnet sets pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS (352f5b3282), but removed ndo_get_stats64 (9cb3d523c1) */
+		/* Use dev_get_tstats64 to read per-CPU stats when NETDEV_PCPU_STAT_TSTATS was set */
+		if (dev->net->pcpu_stat_type == NETDEV_PCPU_STAT_TSTATS)
+			_usbnet_get_stats64 = dev_get_tstats64;
+#endif
 	dev->net->netdev_ops = &qmi_wwan_netdev_ops;
 
 	ql_net_ethtool_ops = *dev->net->ethtool_ops;
@@ -2551,6 +2551,14 @@ static const struct usb_device_id products[] = {
 	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0800, 4, sdx55) },  /* Quectel RG500 */
 	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0801, 4, sdx55) },  /* Quectel RG520 */
 	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0122, 4, sdx55) },  /* Quectel RG650 */
+	{ QMI_FIXED_RAWIP_INTF(0x05c6, 0x90d5, 3, sdx55) },  /* Foxconn T99W240T00 */
+	{ QMI_FIXED_RAWIP_INTF(0x05c6, 0x90db, 2, sdx55) },  /* SIM8200 */
+	{ QMI_FIXED_RAWIP_INTF(0x2dee, 0x4d22, 5, sdx55) }, /* Meige SRM815 */
+	{ QMI_FIXED_RAWIP_INTF(0x305a, 0x1421, 3, sdx55) },  /* gm800 */
+	{ QMI_FIXED_RAWIP_INTF(0x305a, 0x1403, 3, sdx55) },  /* gm800 */
+	{ QMI_FIXED_RAWIP_INTF(0x05C6, 0x9025, 4, sdx55) },
+	{ QMI_FIXED_RAWIP_INTF(0x05C6, 0x9091, 2, sdx55) },
+	{ QMI_FIXED_RAWIP_INTF(0x1BC7, 0x1070, 2, sdx55) },  /* Telit FN990A40 */
 	{ }					/* END */
 };
 MODULE_DEVICE_TABLE(usb, products);
