@@ -457,9 +457,11 @@ define Device/asus_zenwifi-bt8
   KERNEL_LOADADDR := 0x48080000
   IMAGES := sysupgrade.bin
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+ifeq ($(IB),)
 ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),)
   ARTIFACTS := factory.bin
   ARTIFACT/factory.bin := append-image initramfs-kernel.bin | uImage lzma
+endif
 endif
 endef
 TARGET_DEVICES += asus_zenwifi-bt8
